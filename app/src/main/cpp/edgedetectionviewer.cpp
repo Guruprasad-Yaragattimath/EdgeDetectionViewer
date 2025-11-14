@@ -7,11 +7,6 @@
 #define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
-<<<<<<< HEAD
-
-
-=======
->>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
 extern "C"
 JNIEXPORT jbyteArray JNICALL
 Java_com_guru_edgedetectionviewer_camera_FrameProcessor_nativeProcessFrame(
@@ -32,6 +27,7 @@ Java_com_guru_edgedetectionviewer_camera_FrameProcessor_nativeProcessFrame(
         return nullptr;
     }
 
+    // Full NV21 → YUV image (Y + interleaved VU)
     cv::Mat yuv(height + height / 2, width, CV_8UC1,
                 reinterpret_cast<unsigned char *>(nv21));
 
@@ -43,8 +39,10 @@ Java_com_guru_edgedetectionviewer_camera_FrameProcessor_nativeProcessFrame(
         return nullptr;
     }
 
-    if (!processed.isContinuous()) processed = processed.clone();
+    if (!processed.isContinuous())
+        processed = processed.clone();
 
+    // Convert to grayscale if BGR
     if (processed.channels() == 3) {
         cv::Mat g;
         cv::cvtColor(processed, g, cv::COLOR_BGR2GRAY);
@@ -59,8 +57,10 @@ Java_com_guru_edgedetectionviewer_camera_FrameProcessor_nativeProcessFrame(
         return nullptr;
     }
 
-    env->SetByteArrayRegion(outArray, 0, outSize,
-                            reinterpret_cast<jbyte *>(processed.data));
+    env->SetByteArrayRegion(
+            outArray, 0, outSize,
+            reinterpret_cast<jbyte *>(processed.data)
+    );
 
     env->ReleaseByteArrayElements(frameData, nv21, JNI_ABORT);
 
