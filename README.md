@@ -34,3 +34,27 @@ Displays processed grayscale textures
 Fast rendering with shaders
 
 Smooth 60 FPS pipeline (device dependent)
+
+🗂 Project Structure
+
+EdgeDetectionViewer/
+│
+├── app/src/main/java/com/guru/edgedetectionviewer/
+│   ├── MainActivity.kt
+│   ├── camera/
+│   │   ├── CameraController.kt
+│   │   └── FrameProcessor.kt
+│   ├── gl/
+│       ├── GLView.kt
+│       ├── MyRenderer.kt
+│       └── ShaderUtils.kt
+│
+├── app/src/main/cpp/
+│   ├── edgedetectionviewer.cpp        # JNI bridge
+│   ├── opencv_processing.cpp          # C++ OpenCV logic
+│   ├── CMakeLists.txt
+│   ├── opencv/include/                # OpenCV headers
+│   └── jniLibs/                       # Prebuilt OpenCV .so files
+│
+└── AndroidManifest.xml
+
