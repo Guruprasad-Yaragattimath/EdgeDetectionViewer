@@ -1,7 +1,9 @@
 package com.guru.edgedetectionviewer.camera
 
 object FrameProcessor {
+
     init {
+        // Must match CMake add_library(<name>)
         System.loadLibrary("native-lib")
     }
 
