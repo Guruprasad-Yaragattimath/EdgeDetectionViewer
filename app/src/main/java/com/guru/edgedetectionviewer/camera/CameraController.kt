@@ -1,22 +1,34 @@
 package com.guru.edgedetectionviewer.camera
 
 import android.Manifest
+<<<<<<< HEAD
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.ImageFormat
 import android.graphics.SurfaceTexture
+=======
+import android.content.Context
+import android.graphics.ImageFormat
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
 import android.hardware.camera2.*
 import android.media.Image
 import android.media.ImageReader
 import android.os.Handler
 import android.os.HandlerThread
+<<<<<<< HEAD
 import android.util.Log
 import android.util.Size
 import android.view.Surface
+=======
+import android.util.Size
+import android.view.Surface
+import android.view.TextureView
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
 import androidx.annotation.RequiresPermission
 
 class CameraController(
     private val context: Context,
+<<<<<<< HEAD
     private val previewSurfaceTexture: SurfaceTexture?,
     private val onFrameAvailable: (ByteArray, Int, Int) -> Unit
 ) {
@@ -30,10 +42,23 @@ class CameraController(
     private var captureSession: CameraCaptureSession? = null
     private var imageReader: ImageReader? = null
     private var previewSurface: Surface? = null
+=======
+    private val textureView: TextureView,
+    private val onFrameAvailable: (ByteArray, Int, Int) -> Unit
+) {
+
+    private val cameraManager =
+        context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
+
+    private lateinit var cameraDevice: CameraDevice
+    private lateinit var captureSession: CameraCaptureSession
+    private lateinit var imageReader: ImageReader
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
 
     private var backgroundThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
 
+<<<<<<< HEAD
     private var frameCounter = 0
 
 
@@ -41,10 +66,13 @@ class CameraController(
     // START CAMERA
     // ============================================================
     @SuppressLint("MissingPermission")
+=======
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
     @RequiresPermission(Manifest.permission.CAMERA)
     fun startCamera() {
         startBackgroundThread()
 
+<<<<<<< HEAD
         val cameraId = chooseCameraId() ?: return
         val characteristics = cameraManager.getCameraCharacteristics(cameraId)
         val previewSize = choosePreviewSize(characteristics)
@@ -60,6 +88,13 @@ class CameraController(
         previewSurface = Surface(previewSurfaceTexture)
 
         // Create ImageReader
+=======
+        val cameraId = cameraManager.cameraIdList[0]
+        val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+
+        val previewSize = choosePreviewSize(characteristics)
+
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
         imageReader = ImageReader.newInstance(
             previewSize.width,
             previewSize.height,
@@ -67,6 +102,7 @@ class CameraController(
             2
         )
 
+<<<<<<< HEAD
         // ******** KEY FIX: SPARSE LOGGING + FRAME VALIDATION ********
         imageReader!!.setOnImageAvailableListener({ reader ->
             val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
@@ -89,16 +125,27 @@ class CameraController(
             } catch (e: Exception) {
                 Log.e(TAG, "Frame error: ${e.message}")
             } finally {
+=======
+        imageReader.setOnImageAvailableListener({ reader ->
+            val image = reader.acquireLatestImage()
+            if (image != null) {
+                val nv21 = yuv420ToNV21(image)
+                onFrameAvailable(nv21, image.width, image.height)
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
                 image.close()
             }
         }, backgroundHandler)
 
+<<<<<<< HEAD
         // Open camera
+=======
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
         cameraManager.openCamera(
             cameraId,
             object : CameraDevice.StateCallback() {
                 override fun onOpened(device: CameraDevice) {
                     cameraDevice = device
+<<<<<<< HEAD
                     createSession(device)
                 }
 
@@ -110,11 +157,19 @@ class CameraController(
                     Log.e(TAG, "Camera error=$error")
                     device.close()
                 }
+=======
+                    createPreviewSession(previewSize)
+                }
+
+                override fun onDisconnected(device: CameraDevice) {}
+                override fun onError(device: CameraDevice, error: Int) {}
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
             },
             backgroundHandler
         )
     }
 
+<<<<<<< HEAD
 
     // ============================================================
     // CREATE SESSION
@@ -137,6 +192,27 @@ class CameraController(
 
                     imageReader?.surface?.let { builder.addTarget(it) }
                     previewSurface?.let { builder.addTarget(it) }
+=======
+    private fun createPreviewSession(size: Size) {
+        val texture = textureView.surfaceTexture!!
+        texture.setDefaultBufferSize(size.width, size.height)
+
+        val previewSurface = Surface(texture)
+        val surfaces = listOf(previewSurface, imageReader.surface)
+
+        cameraDevice.createCaptureSession(
+            surfaces,
+            object : CameraCaptureSession.StateCallback() {
+                override fun onConfigured(session: CameraCaptureSession) {
+                    captureSession = session
+
+                    val builder = cameraDevice.createCaptureRequest(
+                        CameraDevice.TEMPLATE_PREVIEW
+                    )
+
+                    builder.addTarget(previewSurface)
+                    builder.addTarget(imageReader.surface)
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
 
                     builder.set(
                         CaptureRequest.CONTROL_MODE,
@@ -148,6 +224,7 @@ class CameraController(
                         null,
                         backgroundHandler
                     )
+<<<<<<< HEAD
 
                     Log.i(TAG, "Camera session configured successfully")
                 }
@@ -155,11 +232,17 @@ class CameraController(
                 override fun onConfigureFailed(session: CameraCaptureSession) {
                     Log.e(TAG, "Camera session FAILED")
                 }
+=======
+                }
+
+                override fun onConfigureFailed(session: CameraCaptureSession) {}
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
             },
             backgroundHandler
         )
     }
 
+<<<<<<< HEAD
 
     // ============================================================
     // STOP CAMERA
@@ -220,11 +303,34 @@ class CameraController(
     // ============================================================
     // YUV → NV21
     // ============================================================
+=======
+    private fun startBackgroundThread() {
+        backgroundThread = HandlerThread("CameraThread").also { it.start() }
+        backgroundHandler = Handler(backgroundThread!!.looper)
+    }
+
+    fun stopCamera() {
+        captureSession.close()
+        cameraDevice.close()
+        backgroundThread?.quitSafely()
+    }
+
+    private fun choosePreviewSize(chars: CameraCharacteristics): Size {
+        val map = chars.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP)
+        return map!!.getOutputSizes(ImageFormat.YUV_420_888)[0]
+    }
+
+    // ------------------------------
+    //  NV21 Conversion Function
+    // ------------------------------
+
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
     private fun yuv420ToNV21(image: Image): ByteArray {
         val yPlane = image.planes[0]
         val uPlane = image.planes[1]
         val vPlane = image.planes[2]
 
+<<<<<<< HEAD
         val ySize = yPlane.buffer.remaining()
         val nv21 = ByteArray(ySize + image.width * image.height / 2)
 
@@ -243,6 +349,37 @@ class CameraController(
                 val index = rowStart + col * pixelStride
                 nv21[offset++] = vPlane.buffer[index]
                 nv21[offset++] = uPlane.buffer[index]
+=======
+        val yBuffer = yPlane.buffer
+        val uBuffer = uPlane.buffer
+        val vBuffer = vPlane.buffer
+
+        val ySize = yBuffer.remaining()
+        val uSize = uBuffer.remaining()
+        val vSize = vBuffer.remaining()
+
+        val nv21 = ByteArray(ySize + uSize + vSize)
+
+        // Copy Y
+        yBuffer.get(nv21, 0, ySize)
+
+        // NV21 = Y + VU interleaved
+        val width = image.width
+        val height = image.height
+
+        val rowStride = uPlane.rowStride
+        val pixelStride = uPlane.pixelStride
+
+        var outputPos = ySize
+        val uvHeight = height / 2
+
+        for (row in 0 until uvHeight) {
+            val uvRowStart = row * rowStride
+            for (col in 0 until width / 2) {
+                val offset = uvRowStart + col * pixelStride
+                nv21[outputPos++] = vBuffer.get(offset) // V
+                nv21[outputPos++] = uBuffer.get(offset) // U
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
             }
         }
 

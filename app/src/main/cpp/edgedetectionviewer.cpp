@@ -7,8 +7,11 @@
 #define ALOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #define ALOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 85938770f3fe26b96fb447b109a567e68e88ffc9
 extern "C"
 JNIEXPORT jbyteArray JNICALL
 Java_com_guru_edgedetectionviewer_camera_FrameProcessor_nativeProcessFrame(
