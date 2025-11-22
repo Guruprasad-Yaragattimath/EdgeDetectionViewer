@@ -40,10 +40,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraCaptureSession: CameraCaptureSession
     private val cameraId = "0"
 
-    // ImageReader for YUV frames
+    // 🔥 ImageReader for YUV frames
     private lateinit var imageReader: ImageReader
 
-    // OpenGL
+    // 🔥 OpenGL
     private lateinit var glSurfaceView: GLSurfaceView
     private lateinit var glRenderer: EdgeRenderer
 
@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ----------------------------------------------------------
-    // OpenGL setup
+    // 🔥 OpenGL setup
     // ----------------------------------------------------------
     private fun setupGLSurfaceView() {
         glSurfaceView = findViewById(R.id.glSurfaceView)
@@ -91,31 +91,27 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::glSurfaceView.isInitialized) {
-            glSurfaceView.onResume()
-        }
+        if (::glSurfaceView.isInitialized) glSurfaceView.onResume()
     }
 
     override fun onPause() {
-        if (::glSurfaceView.isInitialized) {
-            glSurfaceView.onPause()
-        }
+        if (::glSurfaceView.isInitialized) glSurfaceView.onPause()
         super.onPause()
     }
 
     // ----------------------------------------------------------
-    // JNI test
+    // 🔥 JNI FRAME TEST
     // ----------------------------------------------------------
     private fun testJNIFrameProcessing() {
         val w = 1280
         val h = 720
         val fakeFrame = ByteArray(w * h) { 1 }
         val result = processFrameJNI(fakeFrame, w, h)
-        Log.d("JNI_FRAME_TEST", "JNI frame test successful → result = $result")
+        Log.d("JNI_FRAME_TEST", "JNI frame test successful → $result")
     }
 
     // ----------------------------------------------------------
-    // Permissions
+    // 🔥 CAMERA PERMISSION HANDLING
     // ----------------------------------------------------------
     private fun hasCameraPermission() =
         ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
@@ -127,16 +123,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onRequestPermissionsResult(code: Int, perms: Array<out String>, results: IntArray) {
-        if (code == 100 && results.isNotEmpty() &&
-            results[0] == PackageManager.PERMISSION_GRANTED
-        ) {
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, results: IntArray) {
+        if (requestCode == 100 && results.isNotEmpty() && results[0] == PackageManager.PERMISSION_GRANTED) {
             openCamera()
         }
     }
 
     // ----------------------------------------------------------
-    // Camera + ImageReader
+    // 🔥 CAMERA + YUV FRAME EXTRACTION
     // ----------------------------------------------------------
     private fun openCamera() {
         if (!hasCameraPermission()) return
@@ -159,13 +153,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun createPreviewSession() {
-
         val width = 1280
         val height = 720
 
-        imageReader = ImageReader.newInstance(
-            width, height, ImageFormat.YUV_420_888, 2
-        )
+        // 🔥 YUV Frame Reader
+        imageReader = ImageReader.newInstance(width, height, ImageFormat.YUV_420_888, 2)
 
         imageReader.setOnImageAvailableListener({ reader ->
             val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
@@ -178,14 +170,14 @@ class MainActivity : AppCompatActivity() {
 
             image.close()
 
-            // Count edges (still for log)
+            // Count edges (debug)
             val edgeCount = processFrameJNI(yData, width, height)
-            Log.d("FRAME_JNI", "Processed frame → JNI output = $edgeCount")
+            Log.d("FRAME_JNI", "Edges: $edgeCount")
 
-            // Get RGBA edge image from C++
+            // Convert edges → RGBA
             val rgba = edgeToRGBA(yData, width, height)
 
-            // Send RGBA frame to GL thread
+            // Push into OpenGL thread
             glSurfaceView.queueEvent {
                 glRenderer.setFrame(rgba, width, height)
             }
@@ -194,6 +186,7 @@ class MainActivity : AppCompatActivity() {
 
         val textureView = findViewById<TextureView>(R.id.textureView)
         val texture = textureView.surfaceTexture ?: return
+
         texture.setDefaultBufferSize(width, height)
 
         val previewSurface = Surface(texture)
@@ -207,6 +200,7 @@ class MainActivity : AppCompatActivity() {
         cameraDevice.createCaptureSession(
             listOf(previewSurface, imageSurface),
             object : CameraCaptureSession.StateCallback() {
+
                 override fun onConfigured(session: CameraCaptureSession) {
                     cameraCaptureSession = session
 
