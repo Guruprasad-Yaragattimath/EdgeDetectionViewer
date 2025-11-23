@@ -1,6 +1,7 @@
 package com.guru.edgedetectionviewer2
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.ImageFormat
@@ -19,10 +20,15 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import java.nio.ByteBuffer
+import java.nio.ByteOrder
+
+import okhttp3.*
+import okhttp3.MediaType.Companion.toMediaType
+import java.io.IOException
 
 class MainActivity : AppCompatActivity() {
 
-    // 🔹 JNI Functions
+    // ===== JNI =====
     external fun stringFromJNI(): String
     external fun processFrameJNI(frame: ByteArray, width: Int, height: Int): Int
     external fun edgeToRGBA(frame: ByteArray, width: Int, height: Int): ByteArray
@@ -33,19 +39,28 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // 🔹 Camera Variables
+    // ===== Reusable Upload Buffer =====
+    private var uploadBuffer: ByteBuffer? = null
+    private var uploadBufferSize = 0
+    private var lastUpload = 0L   // FPS limiting
+
+    // ===== Camera =====
     private lateinit var cameraManager: CameraManager
     private lateinit var cameraDevice: CameraDevice
     private lateinit var captureRequestBuilder: CaptureRequest.Builder
     private lateinit var cameraCaptureSession: CameraCaptureSession
     private val cameraId = "0"
 
-    // 🔥 ImageReader for YUV frames
     private lateinit var imageReader: ImageReader
 
-    // 🔥 OpenGL
+    // ===== OpenGL =====
     private lateinit var glSurfaceView: GLSurfaceView
     private lateinit var glRenderer: EdgeRenderer
+
+    // ===== Network =====
+    private val BASE_URL = "http://10.166.225.136:8080"
+    private val UPLOAD_URL = "$BASE_URL/upload-frame"
+    private val httpClient = OkHttpClient()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,26 +75,21 @@ class MainActivity : AppCompatActivity() {
 
         val textureView = findViewById<TextureView>(R.id.textureView)
         textureView.surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-
             override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
                 if (hasCameraPermission()) openCamera()
             }
-
             override fun onSurfaceTextureSizeChanged(surface: SurfaceTexture, w: Int, h: Int) {}
             override fun onSurfaceTextureDestroyed(surface: SurfaceTexture) = true
             override fun onSurfaceTextureUpdated(surface: SurfaceTexture) {}
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
             insets
         }
     }
 
-    // ----------------------------------------------------------
-    // 🔥 OpenGL setup
-    // ----------------------------------------------------------
     private fun setupGLSurfaceView() {
         glSurfaceView = findViewById(R.id.glSurfaceView)
         glSurfaceView.setEGLContextClientVersion(2)
@@ -99,20 +109,14 @@ class MainActivity : AppCompatActivity() {
         super.onPause()
     }
 
-    // ----------------------------------------------------------
-    // 🔥 JNI FRAME TEST
-    // ----------------------------------------------------------
     private fun testJNIFrameProcessing() {
         val w = 1280
         val h = 720
-        val fakeFrame = ByteArray(w * h) { 1 }
-        val result = processFrameJNI(fakeFrame, w, h)
-        Log.d("JNI_FRAME_TEST", "JNI frame test successful → $result")
+        val fake = ByteArray(w * h) { 1 }
+        Log.d("JNI_FRAME_TEST", "Result: ${processFrameJNI(fake, w, h)}")
     }
 
-    // ----------------------------------------------------------
-    // 🔥 CAMERA PERMISSION HANDLING
-    // ----------------------------------------------------------
+    // Permissions
     private fun hasCameraPermission() =
         ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
                 PackageManager.PERMISSION_GRANTED
@@ -123,100 +127,130 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, results: IntArray) {
-        if (requestCode == 100 && results.isNotEmpty() && results[0] == PackageManager.PERMISSION_GRANTED) {
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 100 &&
+            grantResults.isNotEmpty() &&
+            grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             openCamera()
         }
     }
 
-    // ----------------------------------------------------------
-    // 🔥 CAMERA + YUV FRAME EXTRACTION
-    // ----------------------------------------------------------
+    // ============================
+    // Camera Setup
+    // ============================
+    @SuppressLint("MissingPermission")
     private fun openCamera() {
         if (!hasCameraPermission()) return
         cameraManager = getSystemService(Context.CAMERA_SERVICE) as CameraManager
 
-        try {
-            cameraManager.openCamera(cameraId, object : CameraDevice.StateCallback() {
-                override fun onOpened(camera: CameraDevice) {
-                    cameraDevice = camera
-                    createPreviewSession()
-                }
-
-                override fun onDisconnected(camera: CameraDevice) = camera.close()
-                override fun onError(camera: CameraDevice, error: Int) = camera.close()
-
-            }, null)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+        cameraManager.openCamera(cameraId, object : CameraDevice.StateCallback() {
+            override fun onOpened(cam: CameraDevice) {
+                cameraDevice = cam
+                createPreviewSession()
+            }
+            override fun onDisconnected(cam: CameraDevice) = cam.close()
+            override fun onError(cam: CameraDevice, err: Int) = cam.close()
+        }, null)
     }
 
     private fun createPreviewSession() {
         val width = 1280
         val height = 720
 
-        // 🔥 YUV Frame Reader
         imageReader = ImageReader.newInstance(width, height, ImageFormat.YUV_420_888, 2)
 
         imageReader.setOnImageAvailableListener({ reader ->
             val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
 
             val yPlane = image.planes[0]
-            val yBuffer: ByteBuffer = yPlane.buffer
-
-            val yData = ByteArray(yBuffer.remaining())
-            yBuffer.get(yData)
-
+            val buffer = yPlane.buffer
+            val yData = ByteArray(buffer.remaining())
+            buffer.get(yData)
             image.close()
 
-            // Count edges (debug)
-            val edgeCount = processFrameJNI(yData, width, height)
-            Log.d("FRAME_JNI", "Edges: $edgeCount")
-
-            // Convert edges → RGBA
+            // JNI processing
             val rgba = edgeToRGBA(yData, width, height)
 
-            // Push into OpenGL thread
+            // Render locally
             glSurfaceView.queueEvent {
                 glRenderer.setFrame(rgba, width, height)
             }
+
+            // Upload to server
+            uploadFrameToServer(rgba, width, height)
 
         }, null)
 
         val textureView = findViewById<TextureView>(R.id.textureView)
         val texture = textureView.surfaceTexture ?: return
-
         texture.setDefaultBufferSize(width, height)
 
         val previewSurface = Surface(texture)
         val imageSurface = imageReader.surface
 
-        captureRequestBuilder =
-            cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
+        captureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)
         captureRequestBuilder.addTarget(previewSurface)
         captureRequestBuilder.addTarget(imageSurface)
 
-        cameraDevice.createCaptureSession(
-            listOf(previewSurface, imageSurface),
+        cameraDevice.createCaptureSession(listOf(previewSurface, imageSurface),
             object : CameraCaptureSession.StateCallback() {
-
                 override fun onConfigured(session: CameraCaptureSession) {
                     cameraCaptureSession = session
-
-                    captureRequestBuilder.set(
-                        CaptureRequest.CONTROL_MODE,
-                        CameraMetadata.CONTROL_MODE_AUTO
-                    )
-
                     session.setRepeatingRequest(captureRequestBuilder.build(), null, null)
                 }
-
                 override fun onConfigureFailed(session: CameraCaptureSession) {
-                    Log.e("CAMERA", "Configuration failed")
+                    Log.e("CAMERA", "Failed to configure")
                 }
-            },
-            null
+            }, null)
+    }
+
+    // ============================
+    // Upload Frame to Node server
+    // ============================
+    private fun uploadFrameToServer(rgba: ByteArray, w: Int, h: Int) {
+
+        // --- FPS LIMIT ---
+        val now = System.currentTimeMillis()
+        if (now - lastUpload < 100) return   // 10 FPS
+        lastUpload = now
+        // -----------------
+
+        val needed = 8 + rgba.size
+
+        // Reuse buffer
+        if (uploadBuffer == null || uploadBufferSize != needed) {
+            uploadBuffer = ByteBuffer.allocateDirect(needed).order(ByteOrder.LITTLE_ENDIAN)
+            uploadBufferSize = needed
+            Log.d("UPLOAD", "Allocated direct buffer of $needed bytes")
+        }
+
+        val buf = uploadBuffer!!
+        buf.clear()
+
+        buf.putInt(w)
+        buf.putInt(h)
+        buf.put(rgba)
+
+        val body = RequestBody.create(
+            "application/octet-stream".toMediaType(),
+            buf.array(),
+            0,
+            needed
         )
+
+        val request = Request.Builder()
+            .url(UPLOAD_URL)
+            .post(body)
+            .build()
+
+        httpClient.newCall(request).enqueue(object : Callback {
+            override fun onFailure(call: Call, e: IOException) {
+                Log.e("FRAME_UPLOAD", "Failed: ${e.localizedMessage}")
+            }
+            override fun onResponse(call: Call, response: Response) {
+                response.close()
+            }
+        })
     }
 }

@@ -1,0 +1,16 @@
+{
+  "name": "edge-web-viewer",
+  "version": "1.0.0",
+  "description": "Web viewer for edge detection frames (TypeScript + WebSocket)",
+  "scripts": {
+    "build": "tsc",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}
