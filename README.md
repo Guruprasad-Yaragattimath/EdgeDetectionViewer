@@ -141,44 +141,15 @@ Add authentication.
 Add mobile web viewer.
 
 
-EdgeDetectionViewer/
-│
-├── app/
-│   ├── manifests/
-│   │   └── AndroidManifest.xml
-│   │
-│   ├── kotlin+java/
-│   │   └── com.guru.edgedetectionviewer2/
-│   │       ├── MainActivity.kt
-│   │       ├── EdgeRenderer.kt
-│   │       ├── ExampleInstrumentedTest.kt   (auto-generated)
-│   │
-│   ├── cpp/
-│   │   ├── include.opencv2/                 (OpenCV headers)
-│   │   ├── includes/                        (JNI headers)
-│   │   ├── CMakeLists.txt
-│   │   └── edgedetectionviewer2.cpp         (JNI + OpenCV processing)
-│   │
-│   ├── jniLibs/
-│   │   └── arm64-v8a/
-│   │       ├── libc++_shared.so
-│   │       └── libopencv_java4.so
-│   │
-│   ├── res/
-│   │   ├── layout/
-│   │   │   └── activity_main.xml
-│   │   ├── drawable/
-│   │   ├── mipmap/
-│   │   ├── values/
-│   │   └── xml/
-│   │       └── network_security_config.xml
-│
-├── webviewer/
-│   ├── index.html
-│   ├── viewer.ts
-│   ├── viewer.js  (compiled output of viewer.ts)
-│   └── server.js  (Node.js WebSocket + HTTP server)
-│
-└── README.md
+<img width="620" height="666" alt="Screenshot 2025-11-23 192457" src="https://github.com/user-attachments/assets/33a0b040-e7c8-43da-baac-735c72052681" />
+
+OUTPUT:
+
+![result!](https://github.com/user-attachments/assets/69463e15-ce5f-4bf1-8f30-e6d439e01b0a)
+
+![output](https://github.com/user-attachments/assets/b191bd0a-96a3-47ba-9179-8d8b95b56fa1)
+
+
+
 
 
