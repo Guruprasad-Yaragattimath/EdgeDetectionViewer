@@ -182,5 +182,3 @@ EdgeDetectionViewer/
 └── README.md
 
 
-
-<img width="3139" height="3452" alt="image" src="https://github.com/user-attachments/assets/eaeaca65-44d7-486a-add8-7f25abc3b928" />
